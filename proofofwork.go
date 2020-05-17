@@ -20,7 +20,9 @@ type ProofOfWork struct {
 	target *big.Int //生成区块的难度值
 }
 
-// NewProofOfWork builds and returns a ProofOfWork target = 1 << 240; nonce < target
+// 工作量证明：
+// 目标值：大数初始化为 1，然后左移 256 - 16 位 ：如0x10000000000000000000000000000000000000000000000000000000000
+// 计算获得一个值 小于目标值，这个过程称之为工作量证明，其实就是不断的进行哈希计算，直到找一个符合规则的值
 func NewProofOfWork(b *Block) *ProofOfWork {
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-targetBits))
@@ -30,6 +32,7 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 	return pow
 }
 
+//参数哈希计算的数据
 func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
@@ -45,8 +48,7 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	return data
 }
 
-// Run performs a proof-of-work
-// 不断计算noce和hash值，直到找到一个nonce使得满足hash值小于target
+// 不断计算noce和hash值，直到找到一个nonce值使得满足hash值小于target
 func (pow *ProofOfWork) Run() (int, []byte) {
 	var hashInt big.Int
 	var hash [32]byte
@@ -75,7 +77,7 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	return nonce, hash[:]
 }
 
-// Validate validates block's PoW
+// 校验工作量证明
 func (pow *ProofOfWork) Validate() bool {
 	var hashInt big.Int
 

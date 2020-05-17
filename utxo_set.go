@@ -14,7 +14,7 @@ type UTXOSet struct {
 	Blockchain *Blockchain
 }
 
-// FindSpendableOutputs finds and returns unspent outputs to reference in inputs
+// 查找和返回input中引用的未花费ouput
 func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount int) (int, map[string][]int) {
 	unspentOutputs := make(map[string][]int)
 	accumulated := 0
@@ -23,11 +23,11 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount int) (int, map[s
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(utxoBucket))
 		c := b.Cursor()
-
+		//遍历utxo节后
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			txID := hex.EncodeToString(k)
 			outs := DeserializeOutputs(v)
-
+			//遍历未花费的output，统计累加加金额，记录未花费的ouput，记录txid和outindex
 			for outIdx, out := range outs.Outputs {
 				if out.IsLockedWithKey(pubkeyHash) && accumulated < amount {
 					accumulated += out.Value
@@ -45,7 +45,7 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount int) (int, map[s
 	return accumulated, unspentOutputs
 }
 
-// FindUTXO finds UTXO for a public key hash
+// by公钥hash查询余额：未花费utxo总额
 func (u UTXOSet) FindUTXO(pubKeyHash []byte) []TXOutput {
 	var UTXOs []TXOutput
 	db := u.Blockchain.db
@@ -58,6 +58,7 @@ func (u UTXOSet) FindUTXO(pubKeyHash []byte) []TXOutput {
 			outs := DeserializeOutputs(v)
 
 			for _, out := range outs.Outputs {
+				//判断output中的pubkeyhash和公钥hash是否相等，相等则说明该未花费的utxo归属于当前地址
 				if out.IsLockedWithKey(pubKeyHash) {
 					UTXOs = append(UTXOs, out)
 				}
@@ -73,7 +74,7 @@ func (u UTXOSet) FindUTXO(pubKeyHash []byte) []TXOutput {
 	return UTXOs
 }
 
-// CountTransactions returns the number of transactions in the UTXO set
+// 统计交易数
 func (u UTXOSet) CountTransactions() int {
 	db := u.Blockchain.db
 	counter := 0
@@ -95,11 +96,11 @@ func (u UTXOSet) CountTransactions() int {
 	return counter
 }
 
-// Reindex rebuilds the UTXO set
+//重建utxo
 func (u UTXOSet) Reindex() {
 	db := u.Blockchain.db
 	bucketName := []byte(utxoBucket)
-
+	//删除utxo集合
 	err := db.Update(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket(bucketName)
 		if err != nil && err != bolt.ErrBucketNotFound {
@@ -116,9 +117,9 @@ func (u UTXOSet) Reindex() {
 	if err != nil {
 		log.Panic(err)
 	}
-
+	//遍历所有区块，查找所有未花费的交易输出，并删除已花费的交易输出，返回txid-outputs map
 	UTXO := u.Blockchain.FindUTXO()
-
+	//更新db
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 
@@ -138,6 +139,7 @@ func (u UTXOSet) Reindex() {
 	})
 }
 
+// 更新utxo集合
 // Update updates the UTXO set with transactions from the Block
 // The Block is considered to be the tip of a blockchain
 func (u UTXOSet) Update(block *Block) {

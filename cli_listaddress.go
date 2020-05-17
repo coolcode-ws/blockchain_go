@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+//查询当前节点的所有钱包地址
 func (cli *CLI) listAddresses(nodeID string) {
 	wallets, err := NewWallets(nodeID)
 	if err != nil {

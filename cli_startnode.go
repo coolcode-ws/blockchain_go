@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+//启动节点
 func (cli *CLI) startNode(nodeID, minerAddress string) {
 	fmt.Printf("Starting node %s\n", nodeID)
 	if len(minerAddress) > 0 {

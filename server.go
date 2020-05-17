@@ -21,40 +21,41 @@ var knownNodes = []string{"localhost:3000"}
 var blocksInTransit = [][]byte{}
 var mempool = make(map[string]Transaction)
 
+//交互请求信息
 type addr struct {
 	AddrList []string
 }
 
 type block struct {
-	AddrFrom string
-	Block    []byte
+	AddrFrom string //对端地址
+	Block    []byte //区块
 }
 
 type getblocks struct {
-	AddrFrom string
+	AddrFrom string //对端地址
 }
 
 type getdata struct {
-	AddrFrom string
-	Type     string
-	ID       []byte
+	AddrFrom string //对端地址
+	Type     string //类型
+	ID       []byte //id
 }
 
 type inv struct {
-	AddrFrom string
-	Type     string
-	Items    [][]byte
+	AddrFrom string   //对端地址
+	Type     string   //类型
+	Items    [][]byte //items
 }
 
 type tx struct {
-	AddFrom     string
-	Transaction []byte
+	AddFrom     string //对端地址
+	Transaction []byte //交易信息
 }
 
 type verzion struct {
-	Version    int
-	BestHeight int
-	AddrFrom   string
+	Version    int    //版本号
+	BestHeight int    //最新区块高度
+	AddrFrom   string //对端地址
 }
 
 func commandToBytes(command string) []byte {
@@ -83,7 +84,9 @@ func extractCommand(request []byte) []byte {
 	return request[:commandLength]
 }
 
+//响应addr交互命令
 func requestBlocks() {
+	//遍历所有节点，发送getBLocks交互命令
 	for _, node := range knownNodes {
 		sendGetBlocks(node)
 	}
@@ -106,12 +109,14 @@ func sendBlock(addr string, b *Block) {
 	sendData(addr, request)
 }
 
+// 发送请求到指定地址：version、tx、inv、getblocks、getdata
 func sendData(addr string, data []byte) {
+	//连接节点
 	conn, err := net.Dial(protocol, addr)
 	if err != nil {
 		fmt.Printf("%s is not available\n", addr)
 		var updatedNodes []string
-
+		//连接失败，更新可连接节点列表
 		for _, node := range knownNodes {
 			if node != addr {
 				updatedNodes = append(updatedNodes, node)
@@ -123,13 +128,14 @@ func sendData(addr string, data []byte) {
 		return
 	}
 	defer conn.Close()
-
+	//连接成功，广播数据
 	_, err = io.Copy(conn, bytes.NewReader(data))
 	if err != nil {
 		log.Panic(err)
 	}
 }
 
+//交互命令：Inv
 func sendInv(address, kind string, items [][]byte) {
 	inventory := inv{nodeAddress, kind, items}
 	payload := gobEncode(inventory)
@@ -138,6 +144,7 @@ func sendInv(address, kind string, items [][]byte) {
 	sendData(address, request)
 }
 
+//交互命令：getblocks
 func sendGetBlocks(address string) {
 	payload := gobEncode(getblocks{nodeAddress})
 	request := append(commandToBytes("getblocks"), payload...)
@@ -145,6 +152,7 @@ func sendGetBlocks(address string) {
 	sendData(address, request)
 }
 
+//交互命令： getdata
 func sendGetData(address, kind string, id []byte) {
 	payload := gobEncode(getdata{nodeAddress, kind, id})
 	request := append(commandToBytes("getdata"), payload...)
@@ -152,14 +160,16 @@ func sendGetData(address, kind string, id []byte) {
 	sendData(address, request)
 }
 
+//交互命令：tx
 func sendTx(addr string, tnx *Transaction) {
 	data := tx{nodeAddress, tnx.Serialize()}
 	payload := gobEncode(data)
 	request := append(commandToBytes("tx"), payload...)
-
+	//交易户命令tx：
 	sendData(addr, request)
 }
 
+//交互命令： version
 func sendVersion(addr string, bc *Blockchain) {
 	bestHeight := bc.GetBestHeight()
 	payload := gobEncode(verzion{nodeVersion, bestHeight, nodeAddress})
@@ -169,6 +179,7 @@ func sendVersion(addr string, bc *Blockchain) {
 	sendData(addr, request)
 }
 
+//处理addr交互命令
 func handleAddr(request []byte) {
 	var buff bytes.Buffer
 	var payload addr
@@ -387,6 +398,7 @@ func handleVersion(request []byte, bc *Blockchain) {
 	}
 }
 
+// 处理请求连接
 func handleConnection(conn net.Conn, bc *Blockchain) {
 	request, err := ioutil.ReadAll(conn)
 	if err != nil {
@@ -417,9 +429,10 @@ func handleConnection(conn net.Conn, bc *Blockchain) {
 	conn.Close()
 }
 
-// StartServer starts a node
+// 启动一个节点
 func StartServer(nodeID, minerAddress string) {
-	nodeAddress = fmt.Sprintf("localhost:%s", nodeID)
+	//nodeAddress = fmt.Sprintf("localhost:%s", nodeID)
+	nodeAddress = fmt.Sprintf("localhost:%s", "3000")
 	miningAddress = minerAddress
 	ln, err := net.Listen(protocol, nodeAddress)
 	if err != nil {
@@ -428,11 +441,11 @@ func StartServer(nodeID, minerAddress string) {
 	defer ln.Close()
 
 	bc := NewBlockchain(nodeID)
-
+	//不是第一个节点，发送version交互命令
 	if nodeAddress != knownNodes[0] {
 		sendVersion(knownNodes[0], bc)
 	}
-
+	//监听
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -442,6 +455,7 @@ func StartServer(nodeID, minerAddress string) {
 	}
 }
 
+// gob打包
 func gobEncode(data interface{}) []byte {
 	var buff bytes.Buffer
 
@@ -454,6 +468,7 @@ func gobEncode(data interface{}) []byte {
 	return buff.Bytes()
 }
 
+//节点信息
 func nodeIsKnown(addr string) bool {
 	for _, node := range knownNodes {
 		if node == addr {

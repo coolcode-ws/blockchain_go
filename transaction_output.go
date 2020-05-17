@@ -6,28 +6,28 @@ import (
 	"log"
 )
 
-// TXOutput represents a transaction output
+// 交易输出
 type TXOutput struct {
-	Value      int
-	PubKeyHash []byte
+	Value      int    //币，价值
+	PubKeyHash []byte //交易输出锁定脚本，以地址作为锁定脚本
 }
 
-// Lock signs the output
+// 锁定签名output
 func (out *TXOutput) Lock(address []byte) {
 	pubKeyHash := Base58Decode(address)
 	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
 	out.PubKeyHash = pubKeyHash
 }
 
-// IsLockedWithKey checks if the output can be used by the owner of the pubkey
+// 判断未花费的utxo能否被指定的公钥hash花费：从地址中解析出公钥hash，然后和ouput中的公钥hash比对
 func (out *TXOutput) IsLockedWithKey(pubKeyHash []byte) bool {
 	return bytes.Compare(out.PubKeyHash, pubKeyHash) == 0
 }
 
-// NewTXOutput create a new TXOutput
+// 创建一个交易输出
 func NewTXOutput(value int, address string) *TXOutput {
 	txo := &TXOutput{value, nil}
-	txo.Lock([]byte(address)) //设置公钥hash
+	txo.Lock([]byte(address)) //地址作为锁定脚本
 
 	return txo
 }

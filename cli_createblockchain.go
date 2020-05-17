@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+//创建区块链
 func (cli *CLI) createBlockchain(address, nodeID string) {
 	if !ValidateAddress(address) {
 		log.Panic("ERROR: Address is not valid")

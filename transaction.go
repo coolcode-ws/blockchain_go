@@ -17,11 +17,11 @@ import (
 
 const subsidy = 10
 
-// Transaction represents a Bitcoin transaction
+// 交易
 type Transaction struct {
-	ID   []byte
-	Vin  []TXInput
-	Vout []TXOutput
+	ID   []byte     //交易id
+	Vin  []TXInput  //交易输入：交易可能有一个或多个输入
+	Vout []TXOutput //交易输出：交易可能有一个或多个输出
 }
 
 // IsCoinbase checks whether the transaction is coinbase
@@ -42,7 +42,7 @@ func (tx Transaction) Serialize() []byte {
 	return encoded.Bytes()
 }
 
-// Hash returns the hash of the Transaction
+// 计算交易hash
 func (tx *Transaction) Hash() []byte {
 	var hash [32]byte
 
@@ -54,12 +54,13 @@ func (tx *Transaction) Hash() []byte {
 	return hash[:]
 }
 
-// Sign signs each input of a Transaction
+//  交易签名
 func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transaction) {
+	// coinbase 交易签名为空
 	if tx.IsCoinbase() {
 		return
 	}
-
+	//遍历交易中的所有inputs，判断引用大家交易是否存在
 	for _, vin := range tx.Vin {
 		if prevTXs[hex.EncodeToString(vin.Txid)].ID == nil {
 			log.Panic("ERROR: Previous transaction is not correct")
@@ -69,8 +70,10 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 	txCopy := tx.TrimmedCopy()
 
 	for inID, vin := range txCopy.Vin {
+		//交易hash
 		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 		txCopy.Vin[inID].Signature = nil
+		//上一个交易输出中的公钥hash作为交易input中的公钥
 		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
 
 		dataToSign := fmt.Sprintf("%x\n", txCopy)
@@ -128,12 +131,13 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 	return txCopy
 }
 
-// Verify verifies signatures of Transaction inputs
+// 验证交易中所有input的签名是否合法
 func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
+	//coinbase交易签名为空
 	if tx.IsCoinbase() {
 		return true
 	}
-
+	//交易hash不为空
 	for _, vin := range tx.Vin {
 		if prevTXs[hex.EncodeToString(vin.Txid)].ID == nil {
 			log.Panic("ERROR: Previous transaction is not correct")
@@ -142,7 +146,7 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 
 	txCopy := tx.TrimmedCopy()
 	curve := elliptic.P256()
-
+	//验签
 	for inID, vin := range tx.Vin {
 		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 		txCopy.Vin[inID].Signature = nil
@@ -172,7 +176,8 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 	return true
 }
 
-// NewCoinbaseTX creates a new coinbase transaction
+// 创建coinbase交易
+// 区块的第一笔交易，没有交易输入（特殊的一个交易输入），只有一个交易输出
 func NewCoinbaseTX(to, data string) *Transaction {
 	if data == "" {
 		randData := make([]byte, 20)
@@ -183,8 +188,11 @@ func NewCoinbaseTX(to, data string) *Transaction {
 
 		data = fmt.Sprintf("%x", randData)
 	}
-
+	//特殊的交易输入
+	//]byte{}, -1, nil, []byte(data)
 	txin := TXInput{[]byte{}, -1, nil, []byte(data)}
+	//交易输出
+	//价值；以地址作为锁定脚本
 	txout := NewTXOutput(subsidy, to)
 	tx := Transaction{nil, []TXInput{txin}, []TXOutput{*txout}}
 	tx.ID = tx.Hash()
@@ -192,19 +200,20 @@ func NewCoinbaseTX(to, data string) *Transaction {
 	return &tx
 }
 
-// NewUTXOTransaction creates a new transaction
+// 创建转账交易：钱包、转入地址、资产、utxo集合
 func NewUTXOTransaction(wallet *Wallet, to string, amount int, UTXOSet *UTXOSet) *Transaction {
 	var inputs []TXInput
 	var outputs []TXOutput
-
+	//从钱包的公钥中获取公钥hash
 	pubKeyHash := HashPubKey(wallet.PublicKey)
+	//从公钥hash中查查找可花费的output（未花费的utxo）
 	acc, validOutputs := UTXOSet.FindSpendableOutputs(pubKeyHash, amount)
-
+	//总资产小于待转账资产
 	if acc < amount {
 		log.Panic("ERROR: Not enough funds")
 	}
 
-	// Build a list of inputs
+	// 构建交易中的input
 	for txid, outs := range validOutputs {
 		txID, err := hex.DecodeString(txid)
 		if err != nil {
@@ -217,15 +226,17 @@ func NewUTXOTransaction(wallet *Wallet, to string, amount int, UTXOSet *UTXOSet)
 		}
 	}
 
-	// Build a list of outputs
+	// 构建交易中的ouput
 	from := fmt.Sprintf("%s", wallet.GetAddress())
 	outputs = append(outputs, *NewTXOutput(amount, to))
+	//找零
 	if acc > amount {
 		outputs = append(outputs, *NewTXOutput(acc-amount, from)) // a change
 	}
-
+	//计算交易hash
 	tx := Transaction{nil, inputs, outputs}
 	tx.ID = tx.Hash()
+	//签名
 	UTXOSet.Blockchain.SignTransaction(&tx, wallet.PrivateKey)
 
 	return &tx

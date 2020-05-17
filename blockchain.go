@@ -16,13 +16,14 @@ const dbFile = "blockchain_%s.db" //数据文件
 const blocksBucket = "blocks"
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
-// Blockchain implements interactions with a DB
+//区块链
 type Blockchain struct {
-	tip []byte
-	db  *bolt.DB
+	tip []byte   //当前区块hash
+	db  *bolt.DB //db
 }
 
-// CreateBlockchain creates a new blockchain DB
+// 创建区块链
+//(1) 加载区块链db文件；首次，则创建db文件
 func CreateBlockchain(address, nodeID string) *Blockchain {
 	//创建db文件
 	dbFile := fmt.Sprintf(dbFile, nodeID)
@@ -69,7 +70,7 @@ func CreateBlockchain(address, nodeID string) *Blockchain {
 	return &bc
 }
 
-// NewBlockchain creates a new Blockchain with genesis Block
+// 新建区块链，创建初始快
 func NewBlockchain(nodeID string) *Blockchain {
 	dbFile := fmt.Sprintf(dbFile, nodeID)
 	if dbExists(dbFile) == false {
@@ -154,21 +155,21 @@ func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 	return Transaction{}, errors.New("Transaction is not found")
 }
 
-// FindUTXO finds all unspent transaction outputs and returns transactions with spent outputs removed
+// 遍历所有区块，查找所有未花费的交易输出，并删除已花费的交易输出
 func (bc *Blockchain) FindUTXO() map[string]TXOutputs {
 	UTXO := make(map[string]TXOutputs)
 	spentTXOs := make(map[string][]int)
 	bci := bc.Iterator()
-
+	//遍历所有区块
 	for {
 		block := bci.Next()
-
+		//遍历当前区块所有交易
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
-
+			//遍历当前交易的所有交易输出
 		Outputs:
 			for outIdx, out := range tx.Vout {
-				// Was the output spent?
+				// 判断交易输出是否已花费
 				if spentTXOs[txID] != nil {
 					for _, spentOutIdx := range spentTXOs[txID] {
 						if spentOutIdx == outIdx {
@@ -176,12 +177,12 @@ func (bc *Blockchain) FindUTXO() map[string]TXOutputs {
 						}
 					}
 				}
-
+				//未花费
 				outs := UTXO[txID]
 				outs.Outputs = append(outs.Outputs, out)
 				UTXO[txID] = outs
 			}
-
+			//不是coinbase交易：交易输入中引用的交易输出，意味着这笔交易输出已经被花费
 			if tx.IsCoinbase() == false {
 				for _, in := range tx.Vin {
 					inTxID := hex.EncodeToString(in.Txid)
@@ -205,7 +206,7 @@ func (bc *Blockchain) Iterator() *BlockchainIterator {
 	return bci
 }
 
-// GetBestHeight returns the height of the latest block
+// 查询区块最新高度
 func (bc *Blockchain) GetBestHeight() int {
 	var lastBlock Block
 
@@ -266,18 +267,18 @@ func (bc *Blockchain) GetBlockHashes() [][]byte {
 	return blocks
 }
 
-// MineBlock mines a new block with the provided transactions
+// 挖矿，产生新的区块
 func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 	var lastHeight int
-
+	//校验所有交易是否合法
 	for _, tx := range transactions {
 		// TODO: ignore transaction if it's not valid
 		if bc.VerifyTransaction(tx) != true {
 			log.Panic("ERROR: Invalid transaction")
 		}
 	}
-
+	//获取当前链上的最新区块高度
 	err := bc.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		lastHash = b.Get([]byte("l"))
@@ -292,9 +293,9 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 	if err != nil {
 		log.Panic(err)
 	}
-
+	//创建新的区块
 	newBlock := NewBlock(transactions, lastHash, lastHeight+1)
-
+	//更新区块链，返回新的区块
 	err = bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		err := b.Put(newBlock.Hash, newBlock.Serialize())
@@ -318,10 +319,10 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 	return newBlock
 }
 
-// SignTransaction signs inputs of a Transaction
+// 交易签名
 func (bc *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
 	prevTXs := make(map[string]Transaction)
-
+	//遍历交易中的inputs，查找交易并计算签名源串
 	for _, vin := range tx.Vin {
 		prevTX, err := bc.FindTransaction(vin.Txid)
 		if err != nil {
@@ -329,18 +330,18 @@ func (bc *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey)
 		}
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
-
+	//交易签名
 	tx.Sign(privKey, prevTXs)
 }
 
-// VerifyTransaction verifies transaction input signatures
+// 校验交易中的所有input签名
 func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
 	if tx.IsCoinbase() {
 		return true
 	}
 
 	prevTXs := make(map[string]Transaction)
-
+	//遍历交易中的所有input
 	for _, vin := range tx.Vin {
 		prevTX, err := bc.FindTransaction(vin.Txid)
 		if err != nil {
@@ -348,7 +349,7 @@ func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
 		}
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
-
+	//验证交易签名
 	return tx.Verify(prevTXs)
 }
 

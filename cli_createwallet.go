@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 
+//创建钱包
 func (cli *CLI) createWallet(nodeID string) {
 	wallets, _ := NewWallets(nodeID)
 	address := wallets.CreateWallet()

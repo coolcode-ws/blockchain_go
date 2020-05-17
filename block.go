@@ -7,17 +7,17 @@ import (
 	"time"
 )
 
-// Block represents a block in the blockchain
+// 区块
 type Block struct {
-	Timestamp     int64          //当前时间
-	Transactions  []*Transaction //交易信息
-	PrevBlockHash []byte         //前一个而区块的hash
+	Timestamp     int64          //时间戳
+	Transactions  []*Transaction //交易
+	PrevBlockHash []byte         //前一个区块的hash，区块链就是一个个区块串联而成
 	Hash          []byte         //当前区块hash
 	Nonce         int            //工作量证明：难度值
 	Height        int            //区块高度
 }
 
-// NewBlock creates and returns Block
+// 创建并返回一个区块
 func NewBlock(transactions []*Transaction, prevBlockHash []byte, height int) *Block {
 	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0, height}
 	pow := NewProofOfWork(block) // 工作量证明
@@ -29,7 +29,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte, height int) *Bl
 	return block
 }
 
-// NewGenesisBlock creates and returns genesis Block:创世块-coinbase
+//创建创世块：coinbase交易，第一个区块：只有一个coinbase交易；前一个区块的hash为空；高度为0
 func NewGenesisBlock(coinbase *Transaction) *Block {
 	return NewBlock([]*Transaction{coinbase}, []byte{}, 0)
 }

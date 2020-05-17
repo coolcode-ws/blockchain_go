@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 
+//重新调整utxo
 func (cli *CLI) reindexUTXO(nodeID string) {
 	bc := NewBlockchain(nodeID)
 	UTXOSet := UTXOSet{bc}

@@ -12,12 +12,12 @@ import (
 
 const walletFile = "wallet_%s.dat"
 
-// Wallets stores a collection of wallets
+// 钱包
 type Wallets struct {
 	Wallets map[string]*Wallet
 }
 
-// NewWallets creates Wallets and fills it from a file if it exists
+// 从文件中加载钱包地址
 func NewWallets(nodeID string) (*Wallets, error) {
 	wallets := Wallets{}
 	wallets.Wallets = make(map[string]*Wallet)
@@ -27,7 +27,7 @@ func NewWallets(nodeID string) (*Wallets, error) {
 	return &wallets, err
 }
 
-// CreateWallet adds a Wallet to Wallets
+// 创建新的钱包
 func (ws *Wallets) CreateWallet() string {
 	wallet := NewWallet()
 	address := fmt.Sprintf("%s", wallet.GetAddress())
@@ -37,7 +37,7 @@ func (ws *Wallets) CreateWallet() string {
 	return address
 }
 
-// GetAddresses returns an array of addresses stored in the wallet file
+//查询所有钱包地址
 func (ws *Wallets) GetAddresses() []string {
 	var addresses []string
 
@@ -48,12 +48,12 @@ func (ws *Wallets) GetAddresses() []string {
 	return addresses
 }
 
-// GetWallet returns a Wallet by its address
+// by地址返回钱包
 func (ws Wallets) GetWallet(address string) Wallet {
 	return *ws.Wallets[address]
 }
 
-// LoadFromFile loads wallets from the file
+// 从本地文件中加载钱包
 func (ws *Wallets) LoadFromFile(nodeID string) error {
 	walletFile := fmt.Sprintf(walletFile, nodeID)
 	if _, err := os.Stat(walletFile); os.IsNotExist(err) {
@@ -78,7 +78,7 @@ func (ws *Wallets) LoadFromFile(nodeID string) error {
 	return nil
 }
 
-// SaveToFile saves wallets to a file
+// 保存钱到文件：公私钥对和钱包地址
 func (ws Wallets) SaveToFile(nodeID string) {
 	var content bytes.Buffer
 	walletFile := fmt.Sprintf(walletFile, nodeID)
